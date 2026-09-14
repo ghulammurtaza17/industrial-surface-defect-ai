@@ -17,19 +17,27 @@ SteelSight AI is a premium, production-ready web application for real-time indus
 
 ---
 
-## Deployment (Render & GitHub)
+## Deployment (Google Cloud Run)
 
-This repository is pre-configured for instant deployment on [Render](https://render.com) (or Heroku).
+This repository is fully containerized and pre-configured for instant deployment on [Google Cloud Run](https://cloud.google.com/run).
 
-1. **Fork or Push** this repository to your GitHub account.
-2. **Log into Render** and create a new **Web Service**.
-3. **Connect** your GitHub repository.
-4. **Configuration settings:**
-   - **Environment:** `Python`
-   - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `gunicorn --workers 1 --threads 2 --timeout 120 app:app`
-   - **Instance Type:** Free or Starter (the `tensorflow-cpu` package drastically reduces memory overhead, allowing it to run smoothly on lower-tier instances).
-5. **Deploy!** The `Procfile` and `requirements.txt` are exactly configured to handle the ML dependencies without exhausting memory limits.
+1. **Build and Submit the Container:**
+   Make sure you have the `gcloud` CLI installed and authenticated.
+   ```bash
+   gcloud builds submit --tag gcr.io/PROJECT-ID/steelsight-ai
+   ```
+
+2. **Deploy to Cloud Run:**
+   ```bash
+   gcloud run deploy steelsight-ai \
+     --image gcr.io/PROJECT-ID/steelsight-ai \
+     --platform managed \
+     --allow-unauthenticated \
+     --memory 1Gi \
+     --timeout 180s
+   ```
+   
+   The included `Dockerfile` and `.dockerignore` are explicitly optimized for lightweight ML inference, utilizing `python:3.11-slim`, clamping multi-threading, and forcefully disabling GPU allocations to keep the container fast and lean.
 
 ## Local Development Setup
 
