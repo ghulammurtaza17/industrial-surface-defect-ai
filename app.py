@@ -24,9 +24,6 @@ logger = logging.getLogger(__name__)
 tf.config.threading.set_inter_op_parallelism_threads(1)
 tf.config.threading.set_intra_op_parallelism_threads(1)
 
-# Detect Render environment
-IS_RENDER = os.environ.get('RENDER') is not None
-
 app = Flask(__name__)
 
 # Allowed file extensions
@@ -145,8 +142,7 @@ def health():
     status = {
         'status': 'healthy',
         'model_loaded': model is not None,
-        'class_names': class_names,
-        'is_render': IS_RENDER
+        'class_names': class_names
     }
     return jsonify(status), 200
 
@@ -210,22 +206,18 @@ def predict():
             'top_3': top_3
         }
         
-        if IS_RENDER:
-            # Completely disable Grad-CAM to prevent massive memory spikes
-            response_data['gradcam_error'] = "Grad-CAM unavailable on lightweight cloud deployment"
-        else:
-            try:
-                last_conv_layer = find_last_conv_layer(model)
-                if last_conv_layer:
-                    heatmap = make_gradcam_heatmap(img_array_batch, model, last_conv_layer, pred_idx)
-                    overlay = overlay_gradcam(original_img_array, heatmap)
-                    base64_cam = encode_image_base64(overlay)
-                    response_data['gradcam_image'] = base64_cam
-                else:
-                    response_data['gradcam_error'] = "Could not locate final convolutional layer for Grad-CAM."
-            except Exception as e:
-                logger.error(f"Grad-CAM generation failed: {traceback.format_exc()}")
-                response_data['gradcam_error'] = f"Grad-CAM visualization unavailable: {str(e)}"
+        try:
+            last_conv_layer = find_last_conv_layer(model)
+            if last_conv_layer:
+                heatmap = make_gradcam_heatmap(img_array_batch, model, last_conv_layer, pred_idx)
+                overlay = overlay_gradcam(original_img_array, heatmap)
+                base64_cam = encode_image_base64(overlay)
+                response_data['gradcam_image'] = base64_cam
+            else:
+                response_data['gradcam_error'] = "Could not locate final convolutional layer for Grad-CAM."
+        except Exception as e:
+            logger.error(f"Grad-CAM generation failed: {traceback.format_exc()}")
+            response_data['gradcam_error'] = f"Grad-CAM visualization unavailable: {str(e)}"
         
         # EXTREME MEMORY CLEANUP
         del pil_image
