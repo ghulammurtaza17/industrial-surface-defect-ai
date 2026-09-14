@@ -1,0 +1,30 @@
+{
+    "model_name": "MobileNetV2 Surface Defect Classifier",
+    "class_names": [
+        "crazing",
+        "inclusion",
+        "patches",
+        "pitted_surface",
+        "rolled-in_scale",
+        "scratches"
+    ],
+    "class_to_index": {
+        "crazing": 0,
+        "inclusion": 1,
+        "patches": 2,
+        "pitted_surface": 3,
+        "rolled-in_scale": 4,
+        "scratches": 5
+    },
+    "input_size": [
+        200,
+        200,
+        3
+    ],
+    "input_pixel_range": [
+        0.0,
+        1.0
+    ],
+    "test_accuracy": 1.0,
+    "test_loss": 0.008728427812457085
+}

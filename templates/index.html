@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SteelSight AI - Premium Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="dark-mode">
+
+<div class="app-container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo-mark">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+            </div>
+            <h1 class="brand">SteelSight</h1>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                Dashboard
+            </a>
+            <a href="#history-section" class="nav-item">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                History Logs
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="system-status">
+                <div class="status-indicator">
+                    <div class="status-dot" id="nav-status-dot"></div>
+                </div>
+                <div class="status-text">
+                    <span class="status-title">System Status</span>
+                    <span class="status-value" id="nav-status-text">Connecting...</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-wrapper">
+        
+        <!-- TOP HEADER -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <h2 class="page-title">Inspection Dashboard</h2>
+            </div>
+            <div class="topbar-right">
+                <button class="btn btn-icon" id="theme-toggle" title="Toggle Light/Dark Mode">
+                    <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                    <svg class="moon-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                </button>
+                <div id="export-actions" class="hidden">
+                    <button class="btn btn-secondary btn-sm" id="btn-export-json">Export JSON</button>
+                    <button class="btn btn-primary btn-sm" id="btn-export-pdf">Download PDF</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- DASHBOARD GRID -->
+        <main class="dashboard-content">
+            <div class="dashboard-2col">
+                
+                <!-- LEFT COLUMN: INPUT -->
+                <div class="col-left no-print">
+                    <div class="glass-card full-height">
+                        <div class="card-header">
+                            <h3>Inspection Input</h3>
+                        </div>
+                        
+                        <!-- Upload State -->
+                        <div id="upload-mode">
+                            <div class="drop-zone" id="drop-zone" tabindex="0">
+                                <div class="upload-icon-wrapper">
+                                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                </div>
+                                <h4 class="drop-text">Drag & Drop Steel Image</h4>
+                                <p class="drop-subtext">or click to browse</p>
+                                <button class="btn btn-primary btn-small" id="browse-btn">Browse Files</button>
+                                <input type="file" id="file-input" accept=".png, .jpg, .jpeg" class="hidden-input">
+                                <div class="supported-formats">PNG, JPG, JPEG (Max 10MB)</div>
+                            </div>
+
+                            <div class="samples-section">
+                                <h4>Test Samples</h4>
+                                <div class="sample-buttons">
+                                    <button class="btn btn-sample" data-class="crazing">Crazing</button>
+                                    <button class="btn btn-sample" data-class="inclusion">Inclusion</button>
+                                    <button class="btn btn-sample" data-class="patches">Patches</button>
+                                    <button class="btn btn-sample" data-class="pitted_surface">Pitted</button>
+                                    <button class="btn btn-sample" data-class="rolled-in_scale">Scale</button>
+                                    <button class="btn btn-sample" data-class="scratches">Scratches</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Preview State -->
+                        <div id="preview-mode" class="hidden">
+                            <div class="preview-wrapper">
+                                <img id="image-preview" src="" alt="Preview">
+                                <!-- Animated Analysis Loader -->
+                                <div class="scanner-line hidden" id="scanner-line"></div>
+                                <div class="scanner-overlay hidden" id="scanner-overlay">
+                                    <div class="spinner"></div>
+                                    <span>Analyzing...</span>
+                                </div>
+                            </div>
+                            
+                            <div class="file-details-box">
+                                <div class="detail-row">
+                                    <span class="detail-label">File:</span>
+                                    <span class="detail-value" id="preview-filename">filename.jpg</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Dimensions:</span>
+                                    <span class="detail-value" id="preview-resolution">Calculating...</span>
+                                </div>
+                            </div>
+                            
+                            <div class="action-buttons">
+                                <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
+                                <button class="btn btn-analyze" id="analyze-btn">
+                                    <span class="btn-text">Run Analysis</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="error-message hidden" id="error-message"></div>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN: RESULTS -->
+                <div class="col-right">
+                    <div class="glass-card full-height" id="results-card">
+                        
+                        <!-- Placeholder State -->
+                        <div id="results-placeholder" class="placeholder-content">
+                            <div class="placeholder-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12h4l3-9 5 18 3-9h5"></path></svg>
+                            </div>
+                            <h3>Awaiting Inspection</h3>
+                            <p>Upload an image to generate defect classification, severity metrics, and AI focus heatmaps.</p>
+                        </div>
+
+                        <!-- Active Results State -->
+                        <div id="results-content" class="hidden print-content">
+                            <div class="card-header no-print">
+                                <h3>Analysis Report</h3>
+                            </div>
+
+                            <!-- Print Header (Hidden on screen) -->
+                            <div class="print-only print-header">
+                                <h2>SteelSight AI Inspection Report</h2>
+                                <p>Date: <span id="print-date"></span></p>
+                                <hr>
+                            </div>
+
+                            <div class="metrics-grid">
+                                <div class="metric-primary">
+                                    <div class="metric-label">Detected Defect</div>
+                                    <div class="prediction-value" id="main-class">Scratches</div>
+                                    <div class="severity-badge" id="risk-badge">Severity: High</div>
+                                </div>
+                                <div class="metric-secondary">
+                                    <div class="metric-label">Processing Time</div>
+                                    <div class="time-value" id="res-time">245ms</div>
+                                </div>
+                            </div>
+
+                            <div class="confidence-box">
+                                <div class="conf-header">
+                                    <span>Confidence Score</span>
+                                    <span id="main-conf">98.5%</span>
+                                </div>
+                                <div class="progress-bar-container large">
+                                    <div class="progress-bar" id="main-conf-bar"></div>
+                                </div>
+                                
+                                <div class="top3-title">Top Predictions</div>
+                                <div class="prediction-bars" id="top-predictions-container">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+
+                            <!-- Explanation & Recommendation -->
+                            <div class="insight-boxes">
+                                <div class="explanation-box">
+                                    <div class="insight-title">What this means:</div>
+                                    <p id="explanation-text">...</p>
+                                </div>
+                                <div class="recommendation-box">
+                                    <div class="insight-title">Recommended Action:</div>
+                                    <p id="recommendation-text">...</p>
+                                </div>
+                            </div>
+
+                            <!-- Visualizations -->
+                            <div class="vis-side-by-side">
+                                <div class="vis-box">
+                                    <div class="vis-label">Original Image</div>
+                                    <img id="result-original-img" src="" alt="Original">
+                                </div>
+                                <div class="vis-box">
+                                    <div class="vis-label">Model Focus (Grad-CAM)</div>
+                                    <div class="gradcam-wrapper">
+                                        <img id="result-gradcam-img" src="" alt="Grad-CAM">
+                                        <div class="gradcam-error hidden" id="gradcam-error-msg"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="next-actions no-print">
+                                <button class="btn btn-primary" id="reset-btn">Analyze Another Image</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HISTORY -->
+            <div class="glass-card history-section no-print" id="history-section">
+                <div class="card-header">
+                    <h3>Recent Inspection History</h3>
+                </div>
+                <div class="history-table-container">
+                    <table class="history-table" id="history-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>File Name</th>
+                                <th>Defect Detected</th>
+                                <th>Severity</th>
+                                <th>Confidence</th>
+                                <th>Proc. Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-body">
+                            <tr class="empty-history"><td colspan="6">No recent inspections.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
