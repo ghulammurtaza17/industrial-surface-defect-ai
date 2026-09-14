@@ -189,10 +189,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const response = await fetch('/predict', { method: 'POST', body: formData });
-            const data = await response.json();
             const processingTimeMs = Math.round(performance.now() - startTime);
 
-            if (!response.ok) throw new Error(data.error || 'An error occurred.');
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (parseError) {
+                let errMsg = 'Received an invalid response from the server.';
+                if (response.status === 413) errMsg = 'File size is too large for the server to process.';
+                else if (response.status === 500) errMsg = 'The server encountered an internal error.';
+                else if (response.status === 504) errMsg = 'The server took too long to respond. Please try a smaller image.';
+                else if (!text.trim()) errMsg = 'Received an empty response from the server.';
+                throw new Error(errMsg);
+            }
+
+            if (!response.ok) {
+                let baseMsg = data.error || 'An error occurred during analysis.';
+                if (response.status === 400) baseMsg = 'Invalid Request: ' + baseMsg;
+                else if (response.status === 413) baseMsg = 'File too large: ' + baseMsg;
+                else if (response.status === 500) baseMsg = 'Server Error: ' + baseMsg;
+                else if (response.status === 504) baseMsg = 'Timeout: ' + baseMsg;
+                throw new Error(baseMsg);
+            }
 
             lastResultData = {
                 filename: currentFile.name,

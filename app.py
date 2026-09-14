@@ -135,6 +135,16 @@ def encode_image_base64(img_array):
     img_str = base64.b64encode(buff.getvalue()).decode("utf-8")
     return f"data:image/jpeg;base64,{img_str}"
 
+from werkzeug.exceptions import HTTPException
+
+@app.errorhandler(HTTPException)
+def handle_exception(e):
+    # Return JSON instead of HTML for all HTTP errors (400, 413, 500, 504, etc.)
+    return jsonify({
+        "error": e.description,
+        "code": e.code
+    }), e.code
+
 @app.route('/')
 def index():
     return render_template('index.html')
