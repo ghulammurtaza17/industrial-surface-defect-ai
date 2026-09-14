@@ -1,21 +1,31 @@
 import os
+
+# Set CUDA_VISIBLE_DEVICES=-1 before importing TensorFlow to completely disable GPU
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
 import io
 import json
 import base64
 import logging
+import gc
+import traceback
 from flask import Flask, request, jsonify, render_template
+from werkzeug.exceptions import HTTPException
 from PIL import Image
 import numpy as np
+
 import tensorflow as tf
-import cv2
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configure TensorFlow for low memory environments
+# Configure TensorFlow for extreme low memory environments
 tf.config.threading.set_inter_op_parallelism_threads(1)
 tf.config.threading.set_intra_op_parallelism_threads(1)
+
+# Detect Render environment
+IS_RENDER = os.environ.get('RENDER') is not None
 
 app = Flask(__name__)
 
@@ -53,7 +63,7 @@ def load_model_and_metadata():
             logger.error(f"Model file not found at {MODEL_PATH}")
             
     except Exception as e:
-        logger.error(f"Error loading model or metadata: {e}")
+        logger.error(f"Error loading model or metadata: {traceback.format_exc()}")
 
 # Load model when module is loaded
 load_model_and_metadata()
@@ -71,7 +81,6 @@ def find_last_conv_layer(model):
         except Exception:
             pass
             
-    # Fallback to standard MobileNetV2 last conv layer if not found explicitly by naming
     for layer in reversed(model.layers):
         try:
             if hasattr(layer, 'output_shape') and isinstance(layer.output_shape, tuple):
@@ -82,7 +91,6 @@ def find_last_conv_layer(model):
     return None
 
 def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None):
-    # Create a model that maps the input image to the activations of the last conv layer as well as the output predictions
     grad_model = tf.keras.models.Model(
         model.inputs, 
         [model.get_layer(last_conv_layer_name).output, model.output]
@@ -94,38 +102,24 @@ def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None
             pred_index = tf.argmax(preds[0])
         class_channel = preds[:, pred_index]
 
-    # Gradient of the output neuron for the predicted class w.r.t the feature map
     grads = tape.gradient(class_channel, last_conv_layer_output)
-    
-    # Vector where each entry is the mean intensity of the gradient over a specific feature map channel
     pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
     
-    # Multiply each channel in the feature map array by "how important this channel is" with regard to the predicted class
     last_conv_layer_output = last_conv_layer_output[0]
     heatmap = last_conv_layer_output @ pooled_grads[..., tf.newaxis]
     heatmap = tf.squeeze(heatmap)
-    
-    # Normalize the heatmap between 0 and 1
     heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
     return heatmap.numpy()
 
 def overlay_gradcam(img_array, heatmap, alpha=0.4):
-    # Rescale heatmap to a range 0-255
+    import cv2 # Local import so it doesn't crash the app globally if uninstalled
     heatmap = np.uint8(255 * heatmap)
-    
-    # Use jet colormap to colorize heatmap
     jet = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-    
-    # Convert RGB to BGR for OpenCV
     jet = cv2.cvtColor(jet, cv2.COLOR_BGR2RGB)
-    
-    # Resize colormap to the original image shape
     jet = cv2.resize(jet, (img_array.shape[1], img_array.shape[0]))
     
-    # Superimpose the heatmap on original image
     superimposed_img = jet * alpha + img_array
     superimposed_img = np.clip(superimposed_img, 0, 255).astype(np.uint8)
-    
     return superimposed_img
 
 def encode_image_base64(img_array):
@@ -135,11 +129,8 @@ def encode_image_base64(img_array):
     img_str = base64.b64encode(buff.getvalue()).decode("utf-8")
     return f"data:image/jpeg;base64,{img_str}"
 
-from werkzeug.exceptions import HTTPException
-
 @app.errorhandler(HTTPException)
 def handle_exception(e):
-    # Return JSON instead of HTML for all HTTP errors (400, 413, 500, 504, etc.)
     return jsonify({
         "error": e.description,
         "code": e.code
@@ -154,7 +145,8 @@ def health():
     status = {
         'status': 'healthy',
         'model_loaded': model is not None,
-        'class_names': class_names
+        'class_names': class_names,
+        'is_render': IS_RENDER
     }
     return jsonify(status), 200
 
@@ -173,32 +165,23 @@ def predict():
     if not file or not allowed_file(file.filename):
         return jsonify({'error': 'Invalid file type. Only PNG, JPG, and JPEG are allowed.'}), 400
 
-    # Read image into memory
     try:
         image_bytes = file.read()
-        
-        # Check size (max 10MB)
         if len(image_bytes) > 10 * 1024 * 1024:
             return jsonify({'error': 'File size exceeds 10MB limit'}), 400
-            
         pil_image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
     except Exception as e:
-        logger.error(f"Error reading image: {e}")
+        logger.error(f"Error reading image: {traceback.format_exc()}")
         return jsonify({'error': 'Invalid or corrupted image'}), 400
         
     try:
-        # Save original size for Grad-CAM overlay
         original_img_array = np.array(pil_image)
-        
-        # Preprocess image for prediction
         resized_img = pil_image.resize(input_size)
         img_array = np.array(resized_img, dtype=np.float32) / 255.0
         img_array_batch = np.expand_dims(img_array, axis=0)
         
-        # Predict
-        predictions = model.predict(img_array_batch)[0]
+        predictions = model.predict(img_array_batch, verbose=0)[0]
         
-        # Get top predictions
         top_indices = np.argsort(predictions)[::-1]
         
         top_3 = []
@@ -227,24 +210,40 @@ def predict():
             'top_3': top_3
         }
         
-        # Generate Grad-CAM
-        try:
-            last_conv_layer = find_last_conv_layer(model)
-            if last_conv_layer:
-                heatmap = make_gradcam_heatmap(img_array_batch, model, last_conv_layer, pred_idx)
-                overlay = overlay_gradcam(original_img_array, heatmap)
-                base64_cam = encode_image_base64(overlay)
-                response_data['gradcam_image'] = base64_cam
-            else:
-                response_data['gradcam_error'] = "Could not locate final convolutional layer for Grad-CAM."
-        except Exception as e:
-            logger.error(f"Grad-CAM generation failed: {e}")
-            response_data['gradcam_error'] = f"Grad-CAM visualization unavailable: {str(e)}"
-            
+        if IS_RENDER:
+            # Completely disable Grad-CAM to prevent massive memory spikes
+            response_data['gradcam_error'] = "Grad-CAM unavailable on lightweight cloud deployment"
+        else:
+            try:
+                last_conv_layer = find_last_conv_layer(model)
+                if last_conv_layer:
+                    heatmap = make_gradcam_heatmap(img_array_batch, model, last_conv_layer, pred_idx)
+                    overlay = overlay_gradcam(original_img_array, heatmap)
+                    base64_cam = encode_image_base64(overlay)
+                    response_data['gradcam_image'] = base64_cam
+                else:
+                    response_data['gradcam_error'] = "Could not locate final convolutional layer for Grad-CAM."
+            except Exception as e:
+                logger.error(f"Grad-CAM generation failed: {traceback.format_exc()}")
+                response_data['gradcam_error'] = f"Grad-CAM visualization unavailable: {str(e)}"
+        
+        # EXTREME MEMORY CLEANUP
+        del pil_image
+        del resized_img
+        del img_array
+        del img_array_batch
+        del original_img_array
+        if 'heatmap' in locals(): del heatmap
+        if 'overlay' in locals(): del overlay
+        
+        gc.collect()
+        
         return jsonify(response_data), 200
         
     except Exception as e:
-        logger.error(f"Error during prediction: {e}")
+        logger.error(f"Error during prediction: {traceback.format_exc()}")
+        # Fallback memory cleanup on error
+        gc.collect()
         return jsonify({'error': 'An internal error occurred during prediction.'}), 500
 
 if __name__ == '__main__':
